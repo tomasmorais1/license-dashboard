@@ -1,0 +1,21 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Segoe+UI&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
+/* Aplica a fonte só ao conteúdo principal, não a tudo */
+.block-container *:not([data-testid="stIconMaterial"]) {
+    font-family: 'Segoe UI', sans-serif !important;
+}
+
+/* Força o fundo dos tags dos multiselects na sidebar */
+section[data-testid="stSidebar"] div[data-baseweb="tag"], 
+section[data-testid="stSidebar"] span[data-baseweb="tag"], 
+section[data-testid="stSidebar"] .css-1r6slb0, /* possível classe dos tags */
+section[data-testid="stSidebar"] .css-12jo7m5  /* possível classe dos tags */
+{
+    background-color: rgb(240, 83, 45) !important;
+    color: #fff !important;
+    border: 1px solid rgb(240, 83, 45) !important;
+    border-radius: 8px !important;
+}
+
