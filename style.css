@@ -19,3 +19,50 @@ section[data-testid="stSidebar"] .css-12jo7m5  /* possível classe dos tags */
     border-radius: 8px !important;
 }
 
+.metrics-container {
+    background-color: #1E293B;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+}
+
+.metric-card {
+    /*background: #121826;*/
+    border-radius: 8px;
+    padding: 15px;
+    border: 3px solid #1A1C1F;
+    /*border-left: 4px solid #F0532D;*/
+    transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(240, 83, 45, 0.2);
+}
+
+.metric-title {
+    font-size: 0.9rem;
+    color: #ECECEC;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #F0532D;
+    margin-bottom: 0.25rem;
+}
+
+.metric-subtitle {
+    font-size: 0.8rem;
+    color: #808282;
+}

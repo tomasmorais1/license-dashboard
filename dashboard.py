@@ -5,15 +5,14 @@ import json
 import os
 import streamlit.components.v1 as components
 
+# Load custom CSS
 with open("style.css") as css:
     st.markdown(f'<style>{css.read()}</style>', unsafe_allow_html=True)
 
 st.set_page_config(layout="wide")
 
-# Caminho do ficheiro de custos
+# Constants and configurations
 COSTS_FILE = "license_costs.json"
-
-# Defaults
 default_license_costs = {
     "DESKLESSPACK": 3.12,
     "ATP_ENTERPRISE": 1.59,
@@ -27,14 +26,14 @@ default_license_costs = {
     "Microsoft_Teams_Rooms_Pro": 33.62
 }
 
-# Lê do ficheiro, se existir
+# Load license costs
 if os.path.exists(COSTS_FILE):
     with open(COSTS_FILE, "r") as f:
         license_costs = json.load(f)
 else:
     license_costs = default_license_costs.copy()
 
-# Mapeamento de empresas
+# Company mapping
 company_map = {
     "Clearlake": "Continente",
     "Tecnovia SGPS": "Continente",
@@ -45,53 +44,52 @@ company_map = {
     "Hotel da Graciosa": "Tecnovia Acores"
 }
 
-# === NOVO: Upload do ficheiro CSV ===
+# File upload
 uploaded_file = st.file_uploader("Carregar ficheiro CSV", type=["csv"])
-
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file, sep=";", engine="python", header=None)
-    df.columns = ["Email", "Empresa"] + [f"Licenca{i}" for i in range(1, len(df.columns) - 1)]
-    df["Empresa"] = df["Empresa"].str.replace('"', '').str.strip()
-    df["Empresa"] = df["Empresa"].replace(company_map)
-else:
+if not uploaded_file:
     st.warning("Por favor, carregue um ficheiro CSV para continuar.")
     st.stop()
 
+# Data processing
+df = pd.read_csv(uploaded_file, sep=";", engine="python", header=None)
+df.columns = ["Email", "Empresa"] + [f"Licenca{i}" for i in range(1, len(df.columns) - 1)]
+df["Empresa"] = df["Empresa"].str.replace('"', '').str.strip()
+df["Empresa"] = df["Empresa"].replace(company_map)
 
-# Derreter
-df_melted = df.melt(id_vars=["Email", "Empresa"],
-                    value_vars=[col for col in df.columns if col.startswith("Licenca")],
-                    var_name="Posição",
-                    value_name="License")
+# Melt data
+df_melted = df.melt(
+    id_vars=["Email", "Empresa"],
+    value_vars=[col for col in df.columns if col.startswith("Licenca")],
+    var_name="Posição",
+    value_name="License"
+).dropna(subset=["License"])
 
-df_melted = df_melted.dropna(subset=["License"])
 df_melted = df_melted[df_melted["License"].isin(license_costs.keys())]
 df_melted["Cost (€)"] = df_melted["License"].map(license_costs)
 
-# UI
-st.title("Dashboard de Licenciamento Microsoft")
-st.markdown("Visualize os custos com base nas licenças atribuídas.")
+# Initialize filtered data
+df_filtrado = df_melted.copy()
 
-st.sidebar.image("tecnovia_horizontal.png", use_container_width=True)
+# Sidebar
+with st.sidebar:
+    st.image("tecnovia_horizontal.png", use_container_width=True)
+    
+    st.header("Alterar custos das licenças")
+    for lic in license_costs:
+        license_costs[lic] = st.number_input(
+            f"Custo {lic} (€)", 
+            min_value=0.0, 
+            value=float(license_costs[lic]), 
+            step=0.01
+        )
+    
+    if st.button("Guardar custos", key="guardar_custos_btn"):
+        with open(COSTS_FILE, "w") as f:
+            json.dump(license_costs, f, indent=2)
+        st.success("Custos guardados com sucesso!")
 
-empresas = sorted(df_melted["Empresa"].unique())
-licencas = sorted(df_melted["License"].unique())
-
-st.sidebar.header("Alterar custos das licenças")
-for lic in license_costs:
-    license_costs[lic] = st.sidebar.number_input(
-        f"Custo {lic} (€)", min_value=0.0, value=float(license_costs[lic]), step=0.01
-    )
-
-if st.sidebar.button("Guardar custos", key="guardar_custos_btn"):
-    with open(COSTS_FILE, "w") as f:
-        json.dump(license_costs, f, indent=2)
-    st.sidebar.success("Custos guardados com sucesso!")
-
-df_melted["Cost (€)"] = df_melted["License"].map(license_costs)
-
-# Licenças não atribuídas
-with st.expander("Licenças não atribuídas"):
+# Unassigned licenses
+with st.expander("Licenças não atribuídas", expanded=True):
     st.markdown("Preencha aqui o número de licenças compradas mas não atribuídas a utilizadores.")
     empresa_excedente = st.selectbox("Selecionar empresa para receber estas licenças:", sorted(df_melted["Empresa"].unique()))
     
@@ -128,10 +126,56 @@ with st.expander("Licenças não atribuídas"):
             })
 
     df_ficticio = pd.DataFrame(atribuicoes_ficticias)
-    df_filtrado = df_melted[df_melted["Empresa"].isin(empresas) & df_melted["License"].isin(licencas)]
-    df_filtrado = pd.concat([df_filtrado, df_ficticio], ignore_index=True)
+    df_filtrado = pd.concat([df_melted, df_ficticio], ignore_index=True)
 
-# Resumo por Empresa
+# Main UI
+st.title("Dashboard de Licenciamento Microsoft")
+st.markdown("Visualize os custos com base nas licenças atribuídas.")
+
+# Metrics cards
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.markdown("""
+    <div class="metric-card">
+        <div class="metric-title">Total Empresas</div>
+        <div class="metric-value">{}</div>
+        <div class="metric-subtitle">com licenças</div>
+    </div>
+    """.format(len(df_filtrado["Empresa"].unique())), unsafe_allow_html=True)
+
+with col2:
+    total_licenses = len(df_filtrado)
+    assigned_licenses = len(df_filtrado[df_filtrado["Email"] != "contabilistico@tecnovia.pt"])
+    st.markdown("""
+    <div class="metric-card">
+        <div class="metric-title">Licenças</div>
+        <div class="metric-value">{}/{}</div>
+        <div class="metric-subtitle">atribuídas/totais</div>
+    </div>
+    """.format(assigned_licenses, total_licenses), unsafe_allow_html=True)
+
+with col3:
+    unique_employees = df_filtrado[df_filtrado["Email"] != "contabilistico@tecnovia.pt"]["Email"].nunique()
+    st.markdown("""
+    <div class="metric-card">
+        <div class="metric-title">Colaboradores</div>
+        <div class="metric-value">{}</div>
+        <div class="metric-subtitle">com licenças</div>
+    </div>
+    """.format(unique_employees), unsafe_allow_html=True)
+
+with col4:
+    total_cost = df_filtrado["Cost (€)"].sum()
+    st.markdown("""
+    <div class="metric-card">
+        <div class="metric-title">Custo Total</div>
+        <div class="metric-value">{:,.2f} €</div>
+        <div class="metric-subtitle">mensal</div>
+    </div>
+    """.format(total_cost), unsafe_allow_html=True)
+
+# Summary tables
 summary = df_filtrado.groupby(["Empresa", "License"]).agg(
     Quantidade=("License", "count"),
     Custo_Total=("Cost (€)", "sum")
@@ -146,7 +190,6 @@ pivot_qtd["Total Licenças"] = pivot_qtd.sum(axis=1)
 total_licencas = pivot_qtd.sum(axis=0)
 total_licencas.name = "Nº de Licenças"
 pivot_qtd = pd.concat([pivot_qtd, pd.DataFrame([total_licencas], columns=pivot_qtd.columns)])
-
 
 def style_total_and_header(df, total_labels=[], is_currency=False):
     total_bg = "#F0532D"  
@@ -174,46 +217,54 @@ def style_total_and_header(df, total_labels=[], is_currency=False):
 
     return styled
 
-# === Aplicação às tabelas ===
-
+# Tables
 st.subheader("Resumo de Custos por Empresa e Tipo de Licença")
 st.write(style_total_and_header(pivot_table, total_labels=["Total Geral"], is_currency=True))
 
 st.subheader("Resumo de Quantidade de Licenças por Empresa e Tipo")
 st.write(style_total_and_header(pivot_qtd.astype(int), total_labels=["Nº de Licenças"], is_currency=False))
 
-
+# Charts
 st.subheader("Distribuição de Custos por Tipo de Licença")
 chart1 = summary.groupby("License")["Custo_Total"].sum().reset_index()
-fig1 = px.bar(chart1, x="License", y="Custo_Total", text_auto=".2s", labels={"Custo_Total": "Custo (€)"}, color_discrete_sequence=["rgb(240, 83, 45)"])
+fig1 = px.bar(chart1, x="License", y="Custo_Total", text_auto=".2s", 
+              labels={"Custo_Total": "Custo (€)"}, 
+              color_discrete_sequence=["rgb(240, 83, 45)"])
 st.plotly_chart(fig1, use_container_width=True)
 
 st.subheader("Distribuição de Custos por Empresa")
 chart2 = summary.groupby("Empresa")["Custo_Total"].sum().reset_index()
-fig2 = px.bar(chart2, x="Empresa", y="Custo_Total", text_auto=".2s", labels={"Custo_Total": "Custo (€)"}, color_discrete_sequence=["rgb(240, 83, 45)"])
+fig2 = px.bar(chart2, x="Empresa", y="Custo_Total", text_auto=".2s", 
+              labels={"Custo_Total": "Custo (€)"}, 
+              color_discrete_sequence=["rgb(240, 83, 45)"])
 st.plotly_chart(fig2, use_container_width=True)
 
 st.subheader("Análise por Tipo de Licença")
-licenca_escolhida = st.selectbox("Escolhe um tipo de licença para ver distribuição por empresa:", sorted(df_melted["License"].unique()))
+licenca_escolhida = st.selectbox("Escolhe um tipo de licença para ver distribuição por empresa:", 
+                                sorted(df_melted["License"].unique()))
 df_licenca = summary[summary["License"] == licenca_escolhida]
-fig_drill = px.bar(df_licenca, x="Empresa", y="Custo_Total", text_auto=".2s", title=f"Custo por Empresa para a Licença '{licenca_escolhida}'", labels={"Custo_Total": "Custo (€)"}, color_discrete_sequence=["rgb(240, 83, 45)"])
+fig_drill = px.bar(df_licenca, x="Empresa", y="Custo_Total", text_auto=".2s", 
+                  title=f"Custo por Empresa para a Licença '{licenca_escolhida}'", 
+                  labels={"Custo_Total": "Custo (€)"}, 
+                  color_discrete_sequence=["rgb(240, 83, 45)"])
 st.plotly_chart(fig_drill, use_container_width=True)
 
 st.subheader("Distribuição Percentual de Custos por Licença (por Empresa)")
-
-empresa_escolhida = st.selectbox("Escolhe uma empresa:", sorted(summary["Empresa"].unique()), key="empresa_percent")
+empresa_escolhida = st.selectbox("Escolhe uma empresa:", 
+                                sorted(summary["Empresa"].unique()), 
+                                key="empresa_percent")
 
 df_empresa = summary[summary["Empresa"] == empresa_escolhida].copy()
 custo_total_empresa = df_empresa["Custo_Total"].sum()
 df_empresa["Percentagem"] = (df_empresa["Custo_Total"] / custo_total_empresa) * 100
 
 fig_percent = px.bar(df_empresa,
-                     x="License",
-                     y="Percentagem",
-                     text=df_empresa["Percentagem"].map("{:.1f}%".format),
-                     title=f"Percentagem do Custo por Licença — {empresa_escolhida}",
-                     labels={"Percentagem": "% do custo"},
-                     color_discrete_sequence=["rgb(240, 83, 45)"])
+                    x="License",
+                    y="Percentagem",
+                    text=df_empresa["Percentagem"].map("{:.1f}%".format),
+                    title=f"Percentagem do Custo por Licença — {empresa_escolhida}",
+                    labels={"Percentagem": "% do custo"},
+                    color_discrete_sequence=["rgb(240, 83, 45)"])
 
 fig_percent.update_layout(yaxis_tickformat=".0f", yaxis_range=[0, 100])
 st.plotly_chart(fig_percent, use_container_width=True)
