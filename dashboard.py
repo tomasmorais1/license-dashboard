@@ -128,12 +128,17 @@ with st.expander("Licenças não atribuídas", expanded=True):
     df_ficticio = pd.DataFrame(atribuicoes_ficticias)
     df_filtrado = pd.concat([df_melted, df_ficticio], ignore_index=True)
 
+# Cálculo do custo médio global por colaborador
+total_cost = df_filtrado["Cost (€)"].sum()
+total_employees = df_filtrado[df_filtrado["Email"] != "contabilistico@tecnovia.pt"]["Email"].nunique()
+avg_cost_per_employee = total_cost / total_employees if total_employees > 0 else 0
+
 # Main UI
 st.title("Dashboard de Licenciamento Microsoft")
 st.markdown("Visualize os custos com base nas licenças atribuídas.")
 
 # Metrics cards
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
     st.markdown("""
@@ -174,6 +179,14 @@ with col4:
         <div class="metric-subtitle">mensal</div>
     </div>
     """.format(total_cost), unsafe_allow_html=True)
+with col5:
+    st.markdown("""
+    <div class="metric-card">
+        <div class="metric-title">Custo Médio</div>
+        <div class="metric-value">{:,.2f} €</div>
+        <div class="metric-subtitle">por colaborador</div>
+    </div>
+    """.format(avg_cost_per_employee), unsafe_allow_html=True)
 
 # Summary tables
 summary = df_filtrado.groupby(["Empresa", "License"]).agg(
@@ -324,3 +337,42 @@ fig.update_layout(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
+# Calcula o custo médio por colaborador por empresa
+df_custo_colab = df_filtrado.groupby('Empresa').apply(
+    lambda x: x['Cost (€)'].sum() / x['Email'].nunique()
+).reset_index(name='Custo Médio por Colaborador')
+
+# Ordena do maior para o menor valor
+df_custo_colab = df_custo_colab.sort_values('Custo Médio por Colaborador', ascending=False)
+
+# Cria o gráfico de barras verticais
+fig = px.bar(
+    df_custo_colab,
+    x='Empresa',
+    y='Custo Médio por Colaborador',
+    text=df_custo_colab['Custo Médio por Colaborador'].round(2).astype(str) + '€',
+    title='<b>Custo Médio Mensal por Colaborador por Empresa</b>',
+    labels={'Custo Médio por Colaborador': 'Custo (€)', 'Empresa': ''},
+    color='Custo Médio por Colaborador',
+    color_continuous_scale=['#FFD166', '#F0532D']  # Gradiente amarelo-laranja
+)
+
+# Ajustes estéticos
+fig.update_layout(
+    plot_bgcolor='rgba(0,0,0,0)',
+    paper_bgcolor='rgba(0,0,0,0)',
+    yaxis=dict(
+        title='Custo por Colaborador (€)',
+        gridcolor='rgba(200,200,200,0.2)'
+    ),
+    xaxis=dict(
+        tickangle=-45
+    ),
+    coloraxis_showscale=False,
+    hovermode='x unified'
+)
+
+# Mostra o gráfico
+st.plotly_chart(fig, use_container_width=True)
+

@@ -1,5 +1,5 @@
 [theme]
-primaryColor = "#F0532D"             # Laranja marcante da marca
-backgroundColor = "#0D0F11"          # Preto acinzentado (mais elegante que puro preto)
-secondaryBackgroundColor = "#1A1C1F" # Cartões e áreas de conteúdo com contraste suave
-textColor = "#ECECEC"                # Cinza quase branco (menos agressivo que #FFF)
+primaryColor = "#F0532D"
+backgroundColor = "#0D0F11"
+secondaryBackgroundColor = "#1A1C1F"
+textColor = "#ECECEC"
