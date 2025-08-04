@@ -225,19 +225,19 @@ st.subheader("Resumo de Quantidade de Licenças por Empresa e Tipo")
 st.write(style_total_and_header(pivot_qtd.astype(int), total_labels=["Nº de Licenças"], is_currency=False))
 
 # Charts
-st.subheader("Distribuição de Custos por Tipo de Licença")
-chart1 = summary.groupby("License")["Custo_Total"].sum().reset_index()
-fig1 = px.bar(chart1, x="License", y="Custo_Total", text_auto=".2s", 
-              labels={"Custo_Total": "Custo (€)"}, 
-              color_discrete_sequence=["rgb(240, 83, 45)"])
-st.plotly_chart(fig1, use_container_width=True)
+#st.subheader("Distribuição de Custos por Tipo de Licença")
+#chart1 = summary.groupby("License")["Custo_Total"].sum().reset_index()
+#fig1 = px.bar(chart1, x="License", y="Custo_Total", text_auto=".2s", 
+#              labels={"Custo_Total": "Custo (€)"}, 
+#              color_discrete_sequence=["rgb(240, 83, 45)"])
+#st.plotly_chart(fig1, use_container_width=True)
 
-st.subheader("Distribuição de Custos por Empresa")
-chart2 = summary.groupby("Empresa")["Custo_Total"].sum().reset_index()
-fig2 = px.bar(chart2, x="Empresa", y="Custo_Total", text_auto=".2s", 
-              labels={"Custo_Total": "Custo (€)"}, 
-              color_discrete_sequence=["rgb(240, 83, 45)"])
-st.plotly_chart(fig2, use_container_width=True)
+#st.subheader("Distribuição de Custos por Empresa")
+#chart2 = summary.groupby("Empresa")["Custo_Total"].sum().reset_index()
+#fig2 = px.bar(chart2, x="Empresa", y="Custo_Total", text_auto=".2s", 
+#              labels={"Custo_Total": "Custo (€)"}, 
+#              color_discrete_sequence=["rgb(240, 83, 45)"])
+#st.plotly_chart(fig2, use_container_width=True)
 
 st.subheader("Análise por Tipo de Licença")
 licenca_escolhida = st.selectbox("Escolhe um tipo de licença para ver distribuição por empresa:", 
@@ -249,22 +249,78 @@ fig_drill = px.bar(df_licenca, x="Empresa", y="Custo_Total", text_auto=".2s",
                   color_discrete_sequence=["rgb(240, 83, 45)"])
 st.plotly_chart(fig_drill, use_container_width=True)
 
-st.subheader("Distribuição Percentual de Custos por Licença (por Empresa)")
-empresa_escolhida = st.selectbox("Escolhe uma empresa:", 
-                                sorted(summary["Empresa"].unique()), 
-                                key="empresa_percent")
+st.subheader("Comparação Percentual de Custos por Licença")
 
-df_empresa = summary[summary["Empresa"] == empresa_escolhida].copy()
-custo_total_empresa = df_empresa["Custo_Total"].sum()
-df_empresa["Percentagem"] = (df_empresa["Custo_Total"] / custo_total_empresa) * 100
 
-fig_percent = px.bar(df_empresa,
-                    x="License",
-                    y="Percentagem",
-                    text=df_empresa["Percentagem"].map("{:.1f}%".format),
-                    title=f"Percentagem do Custo por Licença — {empresa_escolhida}",
-                    labels={"Percentagem": "% do custo"},
-                    color_discrete_sequence=["rgb(240, 83, 45)"])
+# Adiciona opção "Nenhum" à lista de empresas
+empresas_disponiveis = ["--------"] + sorted(summary["Empresa"].unique())
 
-fig_percent.update_layout(yaxis_tickformat=".0f", yaxis_range=[0, 100])
-st.plotly_chart(fig_percent, use_container_width=True)
+# Create two columns for company selection
+col1, col2 = st.columns(2)
+
+with col1:
+    empresa_escolhida1 = st.selectbox(
+        "Empresa 1:",
+        sorted(summary["Empresa"].unique()),
+        key="empresa_percent1"
+    )
+
+with col2:
+    empresa_escolhida2 = st.selectbox(
+        "Empresa 2:",
+        [e for e in empresas_disponiveis if e != empresa_escolhida1 or e == "Nenhum"],
+        key="empresa_percent2"
+    )
+
+# Processa dados da primeira empresa
+df_empresa1 = summary[summary["Empresa"] == empresa_escolhida1].copy()
+df_empresa1["Percentagem"] = (df_empresa1["Custo_Total"] / df_empresa1["Custo_Total"].sum()) * 100
+
+# Inicializa dataframe combinado apenas com a primeira empresa
+df_comparacao = df_empresa1.assign(Empresa=empresa_escolhida1)
+
+# Se uma segunda empresa foi selecionada (não é "Nenhum")
+if empresa_escolhida2 != "Nenhum":
+    df_empresa2 = summary[summary["Empresa"] == empresa_escolhida2].copy()
+    df_empresa2["Percentagem"] = (df_empresa2["Custo_Total"] / df_empresa2["Custo_Total"].sum()) * 100
+    df_comparacao = pd.concat([
+        df_comparacao,
+        df_empresa2.assign(Empresa=empresa_escolhida2)
+    ])
+
+# Cria o gráfico apropriado
+if empresa_escolhida2 == "Nenhum":
+    # Gráfico de barras simples para uma empresa
+    fig = px.bar(
+        df_comparacao,
+        x="License",
+        y="Percentagem",
+        text=df_comparacao["Percentagem"].map("{:.1f}%".format),
+        title=f"Distribuição de Custos - {empresa_escolhida1}",
+        labels={"Percentagem": "% do custo", "License": "Tipo de Licença"},
+        color_discrete_sequence=["#F0532D"]  # Cor laranja da Tecnovia
+    )
+else:
+    # Gráfico de barras agrupadas para comparação
+    fig = px.bar(
+        df_comparacao,
+        x="License",
+        y="Percentagem",
+        color="Empresa",
+        barmode="group",
+        text=df_comparacao["Percentagem"].map("{:.1f}%".format),
+        labels={"Percentagem": "% do custo", "License": "Tipo de Licença"},
+        color_discrete_sequence=["#F0532D", "#1E90FF"]  # Laranja + Azul
+    )
+
+# Configurações comuns
+fig.update_layout(
+    yaxis_tickformat=".0f",
+    yaxis_range=[0, 100],
+    uniformtext_minsize=8,
+    uniformtext_mode='hide',
+    xaxis_title="Tipo de Licença",
+    yaxis_title="Percentagem do Custo Total"
+)
+
+st.plotly_chart(fig, use_container_width=True)
