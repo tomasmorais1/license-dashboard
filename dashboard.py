@@ -11,6 +11,13 @@ with open("style.css") as css:
 
 st.set_page_config(layout="wide")
 
+# Inicialização do session_state
+if 'uploaded_file' not in st.session_state:
+    st.session_state.uploaded_file = None
+    st.session_state.file_processed = False
+
+uploader_placeholder = st.empty()
+uploaded_file = None
 # Constants and configurations
 COSTS_FILE = "license_costs.json"
 default_license_costs = {
@@ -44,14 +51,48 @@ company_map = {
     "Hotel da Graciosa": "Tecnovia Acores"
 }
 
+# Sidebar
+with st.sidebar:
+    st.image("tecnovia_horizontal.png", use_container_width=True)
+    
+    if st.button("✖ Alterar ficheiro", type="primary", key="change_file"):
+        st.session_state.uploaded_file = None
+        st.session_state.file_processed = False
+        st.rerun()
+    
+    st.header("Alterar custos das licenças")
+    for lic in license_costs:
+        license_costs[lic] = st.number_input(
+            f"Custo {lic} (€)", 
+            min_value=0.0, 
+            value=float(license_costs[lic]), 
+            step=0.01
+        )
+    
+    if st.button("Guardar custos", key="guardar_custos_btn"):
+        with open(COSTS_FILE, "w") as f:
+            json.dump(license_costs, f, indent=2)
+        st.success("Custos guardados com sucesso!")
+
 # File upload
-uploaded_file = st.file_uploader("Carregar ficheiro CSV", type=["csv"])
-if not uploaded_file:
+uploader_placeholder = st.empty()
+
+if st.session_state.uploaded_file is None:
+    uploaded_file = uploader_placeholder.file_uploader(
+        "Carregar ficheiro CSV", type=["csv"]
+    )
+    if uploaded_file:
+        st.session_state.uploaded_file = uploaded_file
+        uploader_placeholder.empty()
+
+if st.session_state.uploaded_file is None:
     st.warning("Por favor, carregue um ficheiro CSV para continuar.")
     st.stop()
+    
+st.session_state.uploaded_file.seek(0)
 
 # Data processing
-df = pd.read_csv(uploaded_file, sep=";", engine="python", header=None)
+df = pd.read_csv(st.session_state.uploaded_file, sep=";", engine="python", header=None)
 df.columns = ["Email", "Empresa"] + [f"Licenca{i}" for i in range(1, len(df.columns) - 1)]
 df["Empresa"] = df["Empresa"].str.replace('"', '').str.strip()
 df["Empresa"] = df["Empresa"].replace(company_map)
@@ -70,26 +111,17 @@ df_melted["Cost (€)"] = df_melted["License"].map(license_costs)
 # Initialize filtered data
 df_filtrado = df_melted.copy()
 
-# Sidebar
-with st.sidebar:
-    st.image("tecnovia_horizontal.png", use_container_width=True)
-    
-    st.header("Alterar custos das licenças")
-    for lic in license_costs:
-        license_costs[lic] = st.number_input(
-            f"Custo {lic} (€)", 
-            min_value=0.0, 
-            value=float(license_costs[lic]), 
-            step=0.01
-        )
-    
-    if st.button("Guardar custos", key="guardar_custos_btn"):
-        with open(COSTS_FILE, "w") as f:
-            json.dump(license_costs, f, indent=2)
-        st.success("Custos guardados com sucesso!")
+# Cálculo do custo médio global por colaborador
+total_cost = df_filtrado["Cost (€)"].sum()
+total_employees = df_filtrado[df_filtrado["Email"] != "contabilistico@tecnovia.pt"]["Email"].nunique()
+avg_cost_per_employee = total_cost / total_employees if total_employees > 0 else 0
+
+# Main UI
+st.title("Dashboard de Licenciamento Microsoft")
+st.markdown("Visualize os custos com base nas licenças atribuídas.")
 
 # Unassigned licenses
-with st.expander("Licenças não atribuídas", expanded=True):
+with st.expander("Licenças não atribuídas", expanded=False):
     st.markdown("Preencha aqui o número de licenças compradas mas não atribuídas a utilizadores.")
     empresa_excedente = st.selectbox("Selecionar empresa para receber estas licenças:", sorted(df_melted["Empresa"].unique()))
     
@@ -127,15 +159,6 @@ with st.expander("Licenças não atribuídas", expanded=True):
 
     df_ficticio = pd.DataFrame(atribuicoes_ficticias)
     df_filtrado = pd.concat([df_melted, df_ficticio], ignore_index=True)
-
-# Cálculo do custo médio global por colaborador
-total_cost = df_filtrado["Cost (€)"].sum()
-total_employees = df_filtrado[df_filtrado["Email"] != "contabilistico@tecnovia.pt"]["Email"].nunique()
-avg_cost_per_employee = total_cost / total_employees if total_employees > 0 else 0
-
-# Main UI
-st.title("Dashboard de Licenciamento Microsoft")
-st.markdown("Visualize os custos com base nas licenças atribuídas.")
 
 # Metrics cards
 col1, col2, col3, col4, col5 = st.columns(5)
