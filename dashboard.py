@@ -323,7 +323,7 @@ else:
         barmode="group",
         text=df_comparacao["Percentagem"].map("{:.1f}%".format),
         labels={"Percentagem": "% do custo", "License": "Tipo de Licença"},
-        color_discrete_sequence=["#F0532D", "#1E90FF"]  # Laranja + Azul
+        color_discrete_sequence=["#F0532D", "#FFD166"]
     )
 
 # Configurações comuns
@@ -355,7 +355,7 @@ fig = px.bar(
     title='<b>Custo Médio Mensal por Colaborador por Empresa</b>',
     labels={'Custo Médio por Colaborador': 'Custo (€)', 'Empresa': ''},
     color='Custo Médio por Colaborador',
-    color_continuous_scale=['#FFD166', '#F0532D']  # Gradiente amarelo-laranja
+    color_continuous_scale=['#FFD166', '#F0532D']
 )
 
 # Ajustes estéticos
