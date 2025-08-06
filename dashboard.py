@@ -52,44 +52,57 @@ company_map = {
 }
 
 # Sidebar
+# Sidebar
 with st.sidebar:
     st.image("tecnovia_horizontal.png", use_container_width=True)
-    
-    if st.button("✖ Alterar ficheiro", type="primary", key="change_file"):
-        st.session_state.uploaded_file = None
-        st.session_state.file_processed = False
-        st.rerun()
-    
-    st.header("Alterar custos das licenças")
-    for lic in license_costs:
-        license_costs[lic] = st.number_input(
-            f"Custo {lic} (€)", 
-            min_value=0.0, 
-            value=float(license_costs[lic]), 
-            step=0.01
-        )
-    
-    if st.button("Guardar custos", key="guardar_custos_btn"):
-        with open(COSTS_FILE, "w") as f:
-            json.dump(license_costs, f, indent=2)
-        st.success("Custos guardados com sucesso!")
 
-# File upload
-uploader_placeholder = st.empty()
+    if st.session_state.uploaded_file is None:
+        # Apenas mostra o uploader
+        uploaded_file = st.file_uploader("", type=["csv"], key="uploader_sidebar")
+        if uploaded_file:
+            st.session_state.uploaded_file = uploaded_file
+            st.rerun()
 
-if st.session_state.uploaded_file is None:
-    uploaded_file = uploader_placeholder.file_uploader(
-        "Carregar ficheiro CSV", type=["csv"]
+        # Aviso logo abaixo
+        st.warning("Por favor, carregue um ficheiro CSV para continuar.")
+    else:
+        # Container para alinhamento horizontal do botão e nome
+        with st.container():
+            col1, col2 = st.columns([3 , 3])  # aumenta espaço do botão
+            with col1:
+                if st.button("Alterar ficheiro", type="primary", key="change_file"):
+                    st.session_state.uploaded_file = None
+                    st.session_state.file_processed = False
+                    st.rerun()
+            with col2:
+                st.markdown(
+                    f"<div style='display:flex; vertical-align: middle; line-height: 38px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>"
+                    f"{st.session_state.uploaded_file.name}</div>",
+                    unsafe_allow_html=True
     )
-    if uploaded_file:
-        st.session_state.uploaded_file = uploaded_file
-        uploader_placeholder.empty()
+
+        # Só mostra estas opções quando já há ficheiro
+        st.header("Alterar custos das licenças")
+        for lic in license_costs:
+            license_costs[lic] = st.number_input(
+                f"Custo {lic} (€)", 
+                min_value=0.0, 
+                value=float(license_costs[lic]), 
+                step=0.01
+            )
+
+        if st.button("Guardar custos", key="guardar_custos_btn"):
+            with open(COSTS_FILE, "w") as f:
+                json.dump(license_costs, f, indent=2)
+            st.success("Custos guardados com sucesso!")
+
 
 if st.session_state.uploaded_file is None:
-    st.warning("Por favor, carregue um ficheiro CSV para continuar.")
     st.stop()
-    
+
+# Reposiciona o cursor no ficheiro antes de ler
 st.session_state.uploaded_file.seek(0)
+
 
 # Data processing
 df = pd.read_csv(st.session_state.uploaded_file, sep=";", engine="python", header=None)
@@ -369,13 +382,14 @@ df_custo_colab = df_filtrado.groupby('Empresa').apply(
 # Ordena do maior para o menor valor
 df_custo_colab = df_custo_colab.sort_values('Custo Médio por Colaborador', ascending=False)
 
+st.subheader("Custo Médio Mensal por Colaborador por Empresa")
+
 # Cria o gráfico de barras verticais
 fig = px.bar(
     df_custo_colab,
     x='Empresa',
     y='Custo Médio por Colaborador',
     text=df_custo_colab['Custo Médio por Colaborador'].round(2).astype(str) + '€',
-    title='<b>Custo Médio Mensal por Colaborador por Empresa</b>',
     labels={'Custo Médio por Colaborador': 'Custo (€)', 'Empresa': ''},
     color='Custo Médio por Colaborador',
     color_continuous_scale=['#FFD166', '#F0532D']
